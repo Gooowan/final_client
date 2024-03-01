@@ -8,19 +8,12 @@
 
 using namespace std;
 
-enum class BoardState {
-    EMPTY,
-    X,
-    O
-};
 
 class Client {
 private:
     int clientSocket;
     sockaddr_in serverAddr{};
     thread sendThread, receiveThread;
-    condition_variable cv;
-    vector<BoardState> board;
 
     void createSocket(const char* serverIp, int port) {
         clientSocket = socket(AF_INET, SOCK_STREAM, 0);
@@ -41,7 +34,7 @@ private:
         }
     }
 
-    void sendMessage() {
+    void sendMessage() const {
         cout << "TYPE START TO START and MOVE X Y TO MOVE " << endl;
         while (true){
             string message;
@@ -61,10 +54,20 @@ private:
 
         while (true){
             memset(buffer, 0, sizeof(buffer));
-            recv(clientSocket, buffer, sizeof(buffer), 0);
-            string bufferStr = string(buffer);
+            int bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
+            if (bytesReceived <= 0) {
+                close(clientSocket);
+                if (bytesReceived == 0) {
+                    cout << "Server closed the connection" << endl;
+                } else {
+                    perror("Failed to receive message");
+                }
+                break;
+            }
+            string bufferStr = string(buffer, bytesReceived);
             handleCommand(bufferStr);
         }
+
     }
 
     void handleCommand(string command){
@@ -94,7 +97,7 @@ public:
         receiveThread = thread(&Client::receiveMessage, this);
 
         sendThread.join();
-        receiveThread.detach();
+        receiveThread.join();
     }
 };
 
